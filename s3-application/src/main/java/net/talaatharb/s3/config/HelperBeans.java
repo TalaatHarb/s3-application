@@ -32,10 +32,9 @@ public class HelperBeans {
     }
 
     public static final MinioClient buildMinioClient(CredentialConfig config) {
-        String decodedSecretKey = new String(config.secretKey);
         return MinioClient.builder()
                 .endpoint(config.endpoint)
-                .credentials(config.accessKey, decodedSecretKey)
+                .credentials(config.accessKey, config.secretKey)
                 .build();
     }
 }

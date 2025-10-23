@@ -3,6 +3,7 @@ package net.talaatharb.s3.ui.controllers;
 import java.net.URL;
 import java.util.ResourceBundle;
 
+import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.ListView;
@@ -27,6 +28,11 @@ public class MainUiController implements Initializable, SceneManager {
     @Setter(value = AccessLevel.PACKAGE)
     @FXML
     private ListView<String> bucketListView;
+
+    @Getter(value = AccessLevel.PACKAGE)
+    @Setter(value = AccessLevel.PACKAGE)
+    @FXML
+    private ListView<String> objectListView;
 
     private Stage primaryStage;
     
@@ -57,6 +63,20 @@ public class MainUiController implements Initializable, SceneManager {
             }
             var buckets = s3Service.listBuckets();
             bucketListView.getItems().setAll(buckets);
+            // Add listener to bucket selection
+            bucketListView.getSelectionModel().selectedItemProperty().addListener((_, _, newValue) -> {
+                if (newValue != null && s3Service != null && objectListView != null) {
+                    try {
+                        var objects = s3Service.listObjects(newValue, "");
+                        objectListView.setItems(FXCollections.observableArrayList(objects));
+                    } catch (Exception e) {
+                        log.error("Failed to list objects for bucket: " + newValue, e);
+                        objectListView.setItems(FXCollections.observableArrayList());
+                    }
+                } else if (objectListView != null) {
+                    objectListView.setItems(FXCollections.observableArrayList());
+                }
+            });
         } catch (Exception e) {
             log.error("Failed to list buckets", e);
         }
@@ -69,3 +89,4 @@ public class MainUiController implements Initializable, SceneManager {
 }
 
 // Note: Add a ListView with fx:id="bucketListView" to your FXML layout for bucket display.
+// Note: Add a ListView with fx:id="objectListView" to your FXML layout for object display.
