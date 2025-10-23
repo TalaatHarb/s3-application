@@ -11,7 +11,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Properties;
 
+import io.minio.MinioClient;
 import lombok.RequiredArgsConstructor;
+import net.talaatharb.s3.config.HelperBeans;
 import net.talaatharb.s3.dto.CredentialConfig;
 
 @RequiredArgsConstructor
@@ -91,5 +93,9 @@ public class CredentialConfigService {
         } catch (IOException e) {
             throw new CredentialConfigException("Failed to list configurations", e);
         }
+    }
+    
+    public MinioClient getS3Client(CredentialConfig config) {
+        return HelperBeans.buildMinioClient(config);
     }
 }
