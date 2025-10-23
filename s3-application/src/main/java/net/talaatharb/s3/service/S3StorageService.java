@@ -28,6 +28,7 @@ import io.minio.messages.DeleteObject;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.talaatharb.s3.dto.CredentialConfig;
 import net.talaatharb.s3.exceptions.S3StorageException;
 
 @Slf4j
@@ -40,6 +41,13 @@ public class S3StorageService {
         this.minioClient = MinioClient.builder()
                 .endpoint("https://play.min.io") // replace with your S3-compatible endpoint
                 .credentials("minioadmin", "minioadmin") // replace with your credentials
+                .build();
+    }
+
+    public S3StorageService(CredentialConfig config) {
+        this.minioClient = io.minio.MinioClient.builder()
+                .endpoint(config.endpoint)
+                .credentials(config.accessKey, config.secretKey)
                 .build();
     }
 
