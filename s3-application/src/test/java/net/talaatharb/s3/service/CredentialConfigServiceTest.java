@@ -13,7 +13,7 @@ class CredentialConfigServiceTest {
     CredentialConfigService service;
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         service = new CredentialConfigService(tempDir);
     }
 

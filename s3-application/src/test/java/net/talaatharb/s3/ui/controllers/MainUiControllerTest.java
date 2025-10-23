@@ -96,13 +96,5 @@ class MainUiControllerTest extends ApplicationTest {
         ctrl.setConfigService(configService);
         assertDoesNotThrow(() -> ctrl.initialize(null, null));
     }
-    @Test
-    void testInitializeHandlesException() throws Exception {
-        MainUiController ctrl = new MainUiController();
-        ListView<String> listView = new ListView<>();
-        setBucketListView(ctrl, listView);
-        CredentialConfigService configService = mock(CredentialConfigService.class);
-        ctrl.setConfigService(configService);
-        assertDoesNotThrow(() -> ctrl.initialize(null, null));
-    }
+
 }

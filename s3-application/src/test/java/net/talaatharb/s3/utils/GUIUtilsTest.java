@@ -1,12 +1,12 @@
 package net.talaatharb.s3.utils;
 
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.Parent;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.testfx.framework.junit5.ApplicationExtension;
 
-import static org.junit.jupiter.api.Assertions.*;
+import javafx.scene.layout.AnchorPane;
 
 @ExtendWith(ApplicationExtension.class)
 class GUIUtilsTest {

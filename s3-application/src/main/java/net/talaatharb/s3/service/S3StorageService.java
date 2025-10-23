@@ -43,14 +43,6 @@ public class S3StorageService {
                 .credentials("minioadmin", "minioadmin") // replace with your credentials
                 .build();
     }
-
-    public S3StorageService(CredentialConfig config) {
-        this.minioClient = io.minio.MinioClient.builder()
-                .endpoint(config.endpoint)
-                .credentials(config.accessKey, config.secretKey)
-                .build();
-    }
-
     // -------- Bucket Management --------
 
     public List<String> listBuckets()
