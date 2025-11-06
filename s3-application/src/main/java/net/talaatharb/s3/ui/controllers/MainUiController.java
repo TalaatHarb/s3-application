@@ -1,14 +1,26 @@
 package net.talaatharb.s3.ui.controllers;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ResourceBundle;
+import java.util.concurrent.CompletableFuture;
 
+import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -34,14 +46,19 @@ public class MainUiController implements Initializable, SceneManager {
     @Setter(value = AccessLevel.PACKAGE)
     @FXML
     private ListView<String> objectListView;
-    
+
     @Getter(value = AccessLevel.PACKAGE)
     @Setter(value = AccessLevel.PACKAGE)
     @FXML
     private ComboBox<String> configCombo;
 
+    @Getter(value = AccessLevel.PACKAGE)
+    @Setter(value = AccessLevel.PACKAGE)
+    @FXML
+    private VBox tasksVbox;
+
     private Stage primaryStage;
-    
+
     @FXML
     private S3StorageService s3Service;
 
@@ -54,7 +71,7 @@ public class MainUiController implements Initializable, SceneManager {
     public void initialize(URL location, ResourceBundle resources) {
         log.debug("Initializing UI application Main window controller...");
         try {
-            if(configService == null) {
+            if (configService == null) {
                 configService = new CredentialConfigService();
             }
             var configNames = configService.listConfigs();
@@ -96,7 +113,86 @@ public class MainUiController implements Initializable, SceneManager {
         this.primaryStage = primaryStage;
         log.debug("Primary stage set, starting with initial scene");
     }
-}
 
-// Note: Add a ListView with fx:id="bucketListView" to your FXML layout for bucket display.
-// Note: Add a ListView with fx:id="objectListView" to your FXML layout for object display.
+    @FXML
+    public void onConfigSelected() {
+        String selectedConfigName = configCombo.getSelectionModel().getSelectedItem();
+        if (selectedConfigName != null) {
+            try {
+                var config = configService.readConfig(selectedConfigName);
+                var minioClient = configService.getS3Client(config);
+                s3Service = new S3StorageService(minioClient);
+                log.info("Switched to S3 configuration: {}", selectedConfigName);
+                // Refresh bucket list
+                var buckets = s3Service.listBuckets();
+                bucketListView.getItems().setAll(buckets);
+                objectListView.getItems().clear();
+            } catch (Exception e) {
+                log.error("Failed to switch S3 configuration to: " + selectedConfigName, e);
+            }
+        }
+    }
+
+    @FXML
+    public void onDownloadObject() {
+        String selectedBucket = bucketListView.getSelectionModel().getSelectedItem();
+        String selectedObject = objectListView.getSelectionModel().getSelectedItem();
+        if (selectedBucket != null && selectedObject != null) {
+            try {
+                var downloadTask = s3Service.downloadFile(selectedBucket, selectedObject);
+                log.info("Downloading object: {} from bucket: {}", selectedObject, selectedBucket);
+                tasksVbox.getChildren().add(createTaskPane(downloadTask, "Downloading " + selectedObject));
+
+                // Handle completion
+                downloadTask.thenAccept(inputStream -> {
+                    log.info("Download completed for object: {} from bucket: {}", selectedObject, selectedBucket);
+                    // Save to downloads folder
+                    String downloadsDir = "./downloads/";
+                    var outputPath = Paths.get(downloadsDir, selectedObject);
+
+                    try {
+                        Files.createDirectories(outputPath.getParent());
+                        Files.write(outputPath, inputStream.readAllBytes());
+                    } catch (IOException e) {
+                        log.error("Failed to save downloaded object: " + selectedObject + " to downloads folder", e);
+                    }
+
+                    try {
+                        inputStream.close();
+                    } catch (IOException e) {
+                        log.error("Failed to close input stream for downloaded object: " + selectedObject, e);
+                    }
+                });
+            } catch (Exception e) {
+                log.error("Failed to download object: " + selectedObject + " from bucket: " + selectedBucket, e);
+            }
+        }
+    }
+
+    private Node createTaskPane(CompletableFuture<InputStream> downloadTask, String description) {
+        var hbox = new HBox(10);
+        var label = new Label(description);
+        var progressIndicator = new ProgressIndicator();
+        hbox.getChildren().addAll(label, progressIndicator);
+        hbox.setUserData(downloadTask);
+
+        // Handle completion and failure
+        downloadTask.whenComplete((_, throwable) -> {
+            Platform.runLater(() -> {
+                if (throwable != null) {
+                    label.setText(description + " - Failed");
+                    progressIndicator.setProgress(1);
+                } else {
+                    label.setText(description + " - Completed");
+                    progressIndicator.setProgress(1);
+                }
+                // Optionally, remove the pane after a short delay
+                var pause = new PauseTransition(javafx.util.Duration.seconds(2));
+                pause.setOnFinished(_ -> tasksVbox.getChildren().remove(hbox));
+                pause.play();
+            });
+        });
+        return hbox;
+    }
+
+}
