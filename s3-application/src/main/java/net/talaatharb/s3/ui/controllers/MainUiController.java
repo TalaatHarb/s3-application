@@ -78,6 +78,9 @@ public class MainUiController implements Initializable, SceneManager {
             // Fill configCombo with available credential configurations
             if (configCombo != null) {
                 configCombo.setItems(FXCollections.observableArrayList(configNames));
+                if (configNames.size() == 1) {
+                    configCombo.getSelectionModel().select(0);
+                }
             }
             if (configNames.size() == 1) {
                 var config = configService.readConfig(configNames.get(0));

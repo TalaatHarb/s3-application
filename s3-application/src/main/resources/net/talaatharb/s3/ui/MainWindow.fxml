@@ -31,7 +31,7 @@
          <children>
             <AnchorPane>
                <children>
-                  <ComboBox fx:id="configCombo" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+                  <ComboBox fx:id="configCombo" onAction="#onConfigSelected" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
                </children>
             </AnchorPane>
             <ListView fx:id="bucketListView" VBox.vgrow="ALWAYS" />
