@@ -6,6 +6,7 @@ import java.util.ResourceBundle;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListView;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.Stage;
@@ -33,6 +34,11 @@ public class MainUiController implements Initializable, SceneManager {
     @Setter(value = AccessLevel.PACKAGE)
     @FXML
     private ListView<String> objectListView;
+    
+    @Getter(value = AccessLevel.PACKAGE)
+    @Setter(value = AccessLevel.PACKAGE)
+    @FXML
+    private ComboBox<String> configCombo;
 
     private Stage primaryStage;
     
@@ -52,6 +58,10 @@ public class MainUiController implements Initializable, SceneManager {
                 configService = new CredentialConfigService();
             }
             var configNames = configService.listConfigs();
+            // Fill configCombo with available credential configurations
+            if (configCombo != null) {
+                configCombo.setItems(FXCollections.observableArrayList(configNames));
+            }
             if (configNames.size() == 1) {
                 var config = configService.readConfig(configNames.get(0));
                 var minioClient = configService.getS3Client(config);
