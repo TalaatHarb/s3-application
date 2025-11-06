@@ -177,21 +177,19 @@ public class MainUiController implements Initializable, SceneManager {
         hbox.setUserData(downloadTask);
 
         // Handle completion and failure
-        downloadTask.whenComplete((_, throwable) -> {
-            Platform.runLater(() -> {
-                if (throwable != null) {
-                    label.setText(description + " - Failed");
-                    progressIndicator.setProgress(1);
-                } else {
-                    label.setText(description + " - Completed");
-                    progressIndicator.setProgress(1);
-                }
-                // Optionally, remove the pane after a short delay
-                var pause = new PauseTransition(javafx.util.Duration.seconds(2));
-                pause.setOnFinished(_ -> tasksVbox.getChildren().remove(hbox));
-                pause.play();
-            });
-        });
+        downloadTask.whenComplete((_, throwable) -> Platform.runLater(() -> {
+            if (throwable != null) {
+                label.setText(description + " - Failed");
+                progressIndicator.setProgress(1);
+            } else {
+                label.setText(description + " - Completed");
+                progressIndicator.setProgress(1);
+            }
+            // Optionally, remove the pane after a short delay
+            var pause = new PauseTransition(javafx.util.Duration.seconds(2));
+            pause.setOnFinished(_ -> tasksVbox.getChildren().remove(hbox));
+            pause.play();
+        }));
         return hbox;
     }
 
