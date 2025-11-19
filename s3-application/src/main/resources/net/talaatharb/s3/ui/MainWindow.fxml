@@ -21,6 +21,8 @@
             <ToolBar prefHeight="40.0" prefWidth="200.0">
               <items>
                 <Button mnemonicParsing="false" onAction="#onDownloadObject" text="Download" />
+                <Button mnemonicParsing="false" onAction="#onUploadFile" text="Upload File" />
+                <Button mnemonicParsing="false" onAction="#onUploadFolder" text="Upload Folder" />
               </items>
             </ToolBar>
          </children>

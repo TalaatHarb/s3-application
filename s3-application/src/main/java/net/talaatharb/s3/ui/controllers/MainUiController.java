@@ -172,6 +172,68 @@ public class MainUiController implements Initializable, SceneManager {
         }
     }
 
+    @FXML
+    public void onUploadFile() {
+        String selectedBucket = bucketListView.getSelectionModel().getSelectedItem();
+        if (selectedBucket != null) {
+            javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+            fileChooser.setTitle("Select File to Upload");
+            java.io.File file = fileChooser.showOpenDialog(primaryStage);
+            
+            if (file != null) {
+                String objectName = file.getName();
+                var uploadTask = s3Service.uploadFileFromPath(selectedBucket, objectName, file.toPath());
+                log.info("Uploading file: {} to bucket: {}", objectName, selectedBucket);
+                tasksVbox.getChildren().add(createUploadTaskPane(uploadTask, "Uploading " + objectName));
+
+                // Handle completion and refresh object list
+                uploadTask.whenComplete((_, throwable) -> {
+                    if (throwable == null) {
+                        Platform.runLater(() -> {
+                            try {
+                                var objects = s3Service.listObjects(selectedBucket, "");
+                                objectListView.setItems(FXCollections.observableArrayList(objects));
+                            } catch (Exception e) {
+                                log.error("Failed to refresh object list after upload", e);
+                            }
+                        });
+                    }
+                });
+            }
+        }
+    }
+
+    @FXML
+    public void onUploadFolder() {
+        String selectedBucket = bucketListView.getSelectionModel().getSelectedItem();
+        if (selectedBucket != null) {
+            javafx.stage.DirectoryChooser directoryChooser = new javafx.stage.DirectoryChooser();
+            directoryChooser.setTitle("Select Folder to Upload");
+            java.io.File folder = directoryChooser.showDialog(primaryStage);
+            
+            if (folder != null) {
+                String folderName = folder.getName();
+                var uploadTask = s3Service.uploadFolder(selectedBucket, folder.toPath(), folderName);
+                log.info("Uploading folder: {} to bucket: {}", folderName, selectedBucket);
+                tasksVbox.getChildren().add(createUploadTaskPane(uploadTask, "Uploading folder " + folderName));
+
+                // Handle completion and refresh object list
+                uploadTask.whenComplete((_, throwable) -> {
+                    if (throwable == null) {
+                        Platform.runLater(() -> {
+                            try {
+                                var objects = s3Service.listObjects(selectedBucket, "");
+                                objectListView.setItems(FXCollections.observableArrayList(objects));
+                            } catch (Exception e) {
+                                log.error("Failed to refresh object list after upload", e);
+                            }
+                        });
+                    }
+                });
+            }
+        }
+    }
+
     private Node createTaskPane(CompletableFuture<InputStream> downloadTask, String description) {
         var hbox = new HBox(10);
         var label = new Label(description);
@@ -184,6 +246,31 @@ public class MainUiController implements Initializable, SceneManager {
             if (throwable != null) {
                 label.setText(description + " - Failed");
                 progressIndicator.setProgress(1);
+            } else {
+                label.setText(description + " - Completed");
+                progressIndicator.setProgress(1);
+            }
+            // Optionally, remove the pane after a short delay
+            var pause = new PauseTransition(javafx.util.Duration.seconds(2));
+            pause.setOnFinished(_ -> tasksVbox.getChildren().remove(hbox));
+            pause.play();
+        }));
+        return hbox;
+    }
+
+    private Node createUploadTaskPane(CompletableFuture<Void> uploadTask, String description) {
+        var hbox = new HBox(10);
+        var label = new Label(description);
+        var progressIndicator = new ProgressIndicator();
+        hbox.getChildren().addAll(label, progressIndicator);
+        hbox.setUserData(uploadTask);
+
+        // Handle completion and failure
+        uploadTask.whenComplete((_, throwable) -> Platform.runLater(() -> {
+            if (throwable != null) {
+                label.setText(description + " - Failed: " + throwable.getMessage());
+                progressIndicator.setProgress(1);
+                log.error("Upload failed: " + description, throwable);
             } else {
                 label.setText(description + " - Completed");
                 progressIndicator.setProgress(1);

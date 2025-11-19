@@ -89,6 +89,68 @@ public class S3StorageService {
         });
     }
 
+    public CompletableFuture<Void> uploadFileFromPath(String bucketName, String objectName, java.nio.file.Path filePath) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                java.io.InputStream inputStream = java.nio.file.Files.newInputStream(filePath);
+                long size = java.nio.file.Files.size(filePath);
+                String contentType = java.nio.file.Files.probeContentType(filePath);
+                if (contentType == null) {
+                    contentType = "application/octet-stream";
+                }
+                
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucketName)
+                                .object(objectName)
+                                .stream(inputStream, size, -1)
+                                .contentType(contentType)
+                                .build());
+                inputStream.close();
+            } catch (Exception e) {
+                throw new S3StorageException("Failed to upload: " + objectName, e);
+            }
+        });
+    }
+
+    public CompletableFuture<Void> uploadFolder(String bucketName, java.nio.file.Path folderPath, String prefix) {
+        return CompletableFuture.runAsync(() -> {
+            try {
+                java.nio.file.Files.walk(folderPath)
+                    .filter(java.nio.file.Files::isRegularFile)
+                    .forEach(file -> {
+                        try {
+                            String relativePath = folderPath.relativize(file).toString().replace("\\", "/");
+                            String objectName = prefix != null && !prefix.isEmpty() 
+                                ? prefix + "/" + relativePath 
+                                : relativePath;
+                            
+                            java.io.InputStream inputStream = java.nio.file.Files.newInputStream(file);
+                            long size = java.nio.file.Files.size(file);
+                            String contentType = java.nio.file.Files.probeContentType(file);
+                            if (contentType == null) {
+                                contentType = "application/octet-stream";
+                            }
+                            
+                            minioClient.putObject(
+                                    PutObjectArgs.builder()
+                                            .bucket(bucketName)
+                                            .object(objectName)
+                                            .stream(inputStream, size, -1)
+                                            .contentType(contentType)
+                                            .build());
+                            inputStream.close();
+                            log.info("Uploaded: {}", objectName);
+                        } catch (Exception e) {
+                            throw new S3StorageException("Failed to upload file: " + file, e);
+                        }
+                    });
+            } catch (Exception e) {
+                throw new S3StorageException("Failed to upload folder: " + folderPath, e);
+            }
+        });
+    }
+
     public CompletableFuture<InputStream> downloadFile(String bucketName, String objectName) {
         return CompletableFuture.supplyAsync(() -> {
             try {
