@@ -200,42 +200,42 @@ public class S3StorageService {
     }
 
     public CompletableFuture<Void> uploadFolder(String bucketName, java.nio.file.Path folderPath, String prefix) {
-        return CompletableFuture.runAsync(() -> {
-            String normalizedPrefix = normalizePrefix(prefix);
-            try (var pathStream = java.nio.file.Files.walk(folderPath)) {
-                pathStream
-                    .filter(java.nio.file.Files::isRegularFile)
-                    .forEach(file -> {
-                        try {
-                            String relativePath = folderPath.relativize(file).toString().replace("\\", "/");
-                            String objectName = !normalizedPrefix.isEmpty()
-                                ? normalizedPrefix + relativePath
-                                : relativePath;
-                            
-                            try (java.io.InputStream inputStream = java.nio.file.Files.newInputStream(file)) {
-                                long size = java.nio.file.Files.size(file);
-                                String contentType = java.nio.file.Files.probeContentType(file);
-                                if (contentType == null) {
-                                    contentType = "application/octet-stream";
-                                }
-                                
-                                minioClient.putObject(
-                                        PutObjectArgs.builder()
-                                                .bucket(bucketName)
-                                                .object(objectName)
-                                                .stream(inputStream, size, -1)
-                                                .contentType(contentType)
-                                                .build());
-                            }
-                            log.info("Uploaded: {}", objectName);
-                        } catch (Exception e) {
-                            throw new S3StorageException("Failed to upload file: " + file, e);
-                        }
-                    });
-            } catch (Exception e) {
-                throw new S3StorageException("Failed to upload folder: " + folderPath, e);
-            }
-        });
+        List<FileUploadTask> tasks = uploadFolderFiles(bucketName, folderPath, prefix);
+        CompletableFuture<?>[] futures = tasks.stream()
+                .map(FileUploadTask::future)
+                .toArray(CompletableFuture[]::new);
+        return CompletableFuture.allOf(futures);
+    }
+
+    /**
+     * Walks the given folder and returns one {@link CompletableFuture} per file,
+     * each uploading its file concurrently. The returned list preserves the
+     * natural walk order so callers can attach per-file UI feedback.
+     */
+    public List<FileUploadTask> uploadFolderFiles(String bucketName, java.nio.file.Path folderPath, String prefix) {
+        String normalizedPrefix = normalizePrefix(prefix);
+        List<FileUploadTask> tasks = new ArrayList<>();
+        try (var pathStream = java.nio.file.Files.walk(folderPath)) {
+            pathStream
+                .filter(java.nio.file.Files::isRegularFile)
+                .forEach(file -> {
+                    String relativePath = folderPath.relativize(file).toString().replace("\\", "/");
+                    String objectName = !normalizedPrefix.isEmpty()
+                        ? normalizedPrefix + relativePath
+                        : relativePath;
+                    CompletableFuture<Void> future = uploadFileFromPath(bucketName, objectName, file);
+                    tasks.add(new FileUploadTask(objectName, future));
+                });
+        } catch (Exception e) {
+            throw new S3StorageException("Failed to walk folder: " + folderPath, e);
+        }
+        return tasks;
+    }
+
+    /**
+     * Represents a single file upload inside a folder upload operation.
+     */
+    public record FileUploadTask(String objectName, CompletableFuture<Void> future) {
     }
 
     public CompletableFuture<Void> createFolder(String bucketName, String folderPrefix) {

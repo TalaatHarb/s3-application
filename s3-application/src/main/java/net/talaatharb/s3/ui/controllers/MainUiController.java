@@ -270,10 +270,27 @@ public class MainUiController implements Initializable, SceneManager {
 
         if (folder != null) {
             String folderKey = buildFolderKey(folder.getName());
-            CompletableFuture<Void> uploadTask = s3Service.uploadFolder(selectedBucket, folder.toPath(), folderKey);
-            addTaskPane(createTaskPane(uploadTask, "Uploading folder " + folder.getName()));
-            uploadTask.whenComplete((unused, throwable) -> handleAsyncRefresh(selectedBucket, throwable,
-                    "Uploaded folder " + folderKey + '.'));
+            List<S3StorageService.FileUploadTask> fileTasks = s3Service.uploadFolderFiles(selectedBucket,
+                    folder.toPath(), folderKey);
+
+            if (fileTasks.isEmpty()) {
+                updateStatus("The selected folder contains no files.");
+                return;
+            }
+
+            // Create one task pane per file so each upload is visible individually
+            List<CompletableFuture<Void>> allFutures = new ArrayList<>();
+            for (S3StorageService.FileUploadTask fileTask : fileTasks) {
+                addTaskPane(createTaskPane(fileTask.future(), "Uploading " + fileTask.objectName()));
+                allFutures.add(fileTask.future());
+            }
+
+            appendActivity("Uploading folder " + folder.getName() + " (" + fileTasks.size() + " file(s))...");
+
+            // Refresh the view once all individual uploads complete
+            CompletableFuture.allOf(allFutures.toArray(new CompletableFuture[0]))
+                    .whenComplete((unused, throwable) -> handleAsyncRefresh(selectedBucket, throwable,
+                            "Uploaded folder " + folderKey + " (" + fileTasks.size() + " file(s))."));
         }
     }
 
