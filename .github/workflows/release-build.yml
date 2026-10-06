@@ -22,7 +22,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: 'temurin'
 
       - name: Build with Maven (Linux/macOS)
@@ -44,11 +44,43 @@ jobs:
           TAG_NAME=${GITHUB_REF#refs/tags/}              # v1.0.0
           VERSION=${TAG_NAME#v}                          # 1.0.0
           cd s3-application/target
-          ORIGINAL_JAR=$(ls *SNAPSHOT-jar-with-dependencies.jar)
+          ORIGINAL_JAR=$(ls s3-application-*-jar-with-dependencies.jar | head -n 1)
           RENAMED_JAR="s3-application-${VERSION}-${{ runner.os }}.jar"
           cp "$ORIGINAL_JAR" "$RENAMED_JAR"
           echo "RENAMED_JAR_PATH=s3-application/target/$RENAMED_JAR" >> $GITHUB_ENV
         shell: bash
+
+      - name: Package standalone Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v',''
+          $appVersionMatch = [regex]::Match($version, '^\d+(?:\.\d+){0,2}')
+          if (-not $appVersionMatch.Success) {
+            throw "Release tag must start with a numeric version for jpackage: $version"
+          }
+          $appVersion = $appVersionMatch.Value
+          $target = "s3-application/target"
+          $staging = Join-Path $target "jpackage-input"
+          $imageDestination = Join-Path $target "jpackage-output"
+          $appName = "S3Application"
+          $fatJar = Get-ChildItem -Path "$target/s3-application-*-jar-with-dependencies.jar" | Select-Object -First 1
+
+          New-Item -ItemType Directory -Path $staging -Force | Out-Null
+          Copy-Item $fatJar.FullName -Destination (Join-Path $staging "s3-application.jar")
+          jpackage `
+            --type app-image `
+            --input $staging `
+            --name $appName `
+            --main-jar s3-application.jar `
+            --main-class net.talaatharb.s3.S3Application `
+            --app-version $appVersion `
+            --vendor "Talaat Harb" `
+            --dest $imageDestination
+
+          $portableArchive = Join-Path $target "s3-application-$version-Windows-portable.zip"
+          Compress-Archive -Path (Join-Path $imageDestination $appName) -DestinationPath $portableArchive
+          "PORTABLE_APP_PATH=s3-application/target/s3-application-$version-Windows-portable.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Upload JAR to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -60,5 +92,14 @@ jobs:
             - Built on `${{ runner.os }}`
             - Includes the JAR file with dependencies.
           files: ${{ env.RENAMED_JAR_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload standalone Windows application to GitHub Release
+        if: runner.os == 'Windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: ${{ env.PORTABLE_APP_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
